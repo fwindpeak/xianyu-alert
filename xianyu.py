@@ -4,27 +4,68 @@
 import urllib,urllib2
 from pyquery import PyQuery
 import urlparse
+import itchat
+import time
+import os.path
 
 keywords=['文曲星','电子词典']
+UserName = '@98d290ab92f3aec018afa92c2ec0521d'
 
 def get_url(keyword):
     url = 'https://s.2.taobao.com/list/list.htm?st_edtime=1&ist=0&q=%s'%(urllib.quote(keyword.decode('utf8').encode('gbk')))
     return url
 
-def process(soup):
-    doc = PyQuery(url)
-    item_info = doc('ul li div.item-info').eq(0)
-    item_url = item_info('div.item-pic a').attr('href')
-    r = urlparse.urlparse(item_url)
-    item_id = urlparse.parse_qs(r.query)['id'][0]
-    item_title = item_info('h4.item-title').text()
-    item_price =  item_info('div.item-price span.price em').text()
-    item_description = item_info('div.item-description').text()
-    item_url = item_info('div.item-pic a').attr('href')
-    print item_title,item_price,item_description,item_url,item_id
-    
+def check(id):
+    ID_FILE_NAME='id_list.txt'
+    if os.path.exists(ID_FILE_NAME) == False:
+        id_list= ['1']
+        open(ID_FILE_NAME,'w').write(repr(id_list))
+    id_list = open(ID_FILE_NAME).read()
+    id_list = eval(id_list)
 
-for keyword in  keywords:
-    url = get_url(keyword)
-    print url
-    process(url)
+    if id in id_list:
+        return False
+    
+    id_list.append(id)
+    open(ID_FILE_NAME,'w+').write(repr(id_list))
+    return True
+
+def process(url):
+    doc = PyQuery(url)
+    item_info_list = doc('ul li div.item-info') 
+    for item_info in item_info_list:
+        item_info = doc('ul li div.item-info').eq(0)
+        item_url = item_info('div.item-pic a').attr('href')
+        r = urlparse.urlparse(item_url)
+        item_id = urlparse.parse_qs(r.query)['id'][0]
+        if check(item_id) == False:
+            continue
+        item_title = item_info('h4.item-title').text()
+        item_price =  item_info('div.item-price span.price em').text()
+        item_description = item_info('div.item-description').text()
+        item_url = item_info('div.item-pic a').attr('href')
+        msg="%s \n%s \n%s \nhttps:%s"%(item_title,item_price,item_description,item_url)
+        print msg
+        itchat.send(msg,toUserName=UserName)
+
+def chat_login():
+    global UserName
+
+    itchat.auto_login()
+    UserName = itchat.search_friends(nickName='Wind')[0]['UserName']
+
+    print UserName
+
+    
+def main():
+    chat_login()
+    while 1:
+        for keyword in  keywords:
+            url = get_url(keyword)
+            # print url
+            process(url)
+        time.sleep(10)
+
+
+if __name__ == '__main__':
+    main()
